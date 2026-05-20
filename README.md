@@ -11,9 +11,9 @@ for **60–90% token savings** on git / npm / dev operations.
 
 > [!NOTE]
 > RTK is not bundled with this extension. Install it separately and put
-> `rtk` on your PATH; the extension only detects it and toasts a setup
-> hint once. The actual `rtk <cmd>` prefixing is a TEDI core preference
-> (`aiShellPrefix`); see step 3 in [Install](#install) below.
+> `rtk` on your PATH; the extension detects it at activate and wires the
+> prefix automatically. Disable or uninstall the extension to fully
+> revert (TEDI's AI shell tools fall back to running commands raw).
 
 ---
 
@@ -26,10 +26,10 @@ In TEDI:
 3. Paste `IlhamriSKY/TEDI.rtk-bridge` (or the full URL).
 4. Click **Review → Install**.
 
-Then flip the AI shell prefix once:
-
-5. Open **Settings → Agents** → **AI shell prefix**, type `rtk ` (with a
-   trailing space), click **Save**.
+That's it. No manual settings to flip. The extension registers a shell-
+command transformer with TEDI's generic extension API at activate; from
+then on every AI-issued shell command becomes `rtk <command>` until you
+disable or uninstall.
 
 TEDI hits `releases/latest` on this repo, downloads the `.zip` asset
 produced by the [release workflow](.github/workflows/release.yml), runs
@@ -54,32 +54,34 @@ TEDI AI agent
     │
     │  tool: bash_run({ command: "git status" })
     ▼
-src/modules/ai/tools/shell.ts  ── reads `aiShellPrefix`
+src/modules/ai/tools/shell.ts
     │
-    │  effective = "rtk " + "git status"
+    │  applyShellTransformers(cmd, "bash")
+    │     iterates registered extension transformers in insertion order
+    ▼
+ctx.shell.registerCommandTransformer((cmd) => "rtk " + cmd)
+    │  (registered by this extension at activate)
     ▼
 Rust: shell_session_run
     │
     │  PowerShell on Windows, $SHELL -lc on Unix
     ▼
-rtk git status  ──▶  git  ──▶  trimmed output  ──▶  fewer tokens billed
+rtk git status  →  git  →  trimmed output  →  fewer tokens billed
 ```
 
 The extension itself never touches the command stream. On activate it:
 
-1. Runs `rtk --version` once to check that RTK is on PATH.
-2. If RTK is detected and the onboarding toast hasn't fired before,
-   shows a one-shot toast with the setup hint.
-3. Latches a flag in per-extension storage so the toast appears at most
-   once per machine, even across reinstalls.
+1. Runs `rtk --version` once to confirm RTK is on PATH.
+2. If detected, calls `ctx.shell.registerCommandTransformer((cmd) => "rtk " + cmd)`.
+3. Toasts the user once that RTK Bridge is active (latched in
+   per-extension storage, so the prompt appears at most once per machine).
 
-That's it. No polling, no status-bar icon, no `rtk gain` UI. If you
-install RTK *after* enabling the extension, toggle the extension off
-then on from Settings → Extensions to retrigger the probe.
+On deactivate / uninstall, TEDI's extension host automatically runs the
+disposer the registration returned; the transformer chain returns to
+passthrough with zero leftover state. No core TEDI code is RTK-aware.
 
-Extension-scoped settings cannot read or write core TEDI preferences
-(by design), so the extension cannot reflect or flip the
-`aiShellPrefix` flag itself. Verify it manually in Settings → Agents.
+If you install RTK *after* enabling the extension, toggle the extension
+off then on from Settings → Extensions to retrigger the probe.
 
 ---
 
@@ -90,6 +92,7 @@ Declared in `manifest.json`:
 ```json
 "permissions": [
   "ui:toast",
+  "shell:transform",
   "invoke:shell_run_command"
 ]
 ```
@@ -97,6 +100,7 @@ Declared in `manifest.json`:
 | Permission                  | What it lets the extension do                                                              |
 | --------------------------- | ------------------------------------------------------------------------------------------ |
 | `ui:toast`                  | Onboarding toast on first RTK detect.                                                      |
+| `shell:transform`           | Register a synchronous function the host calls before every AI shell command. **High risk** — the extension chooses what actually runs. |
 | `invoke:shell_run_command`  | Run `rtk --version`. One-shot per activate; no long-running process, no sidecar.           |
 
 No filesystem, no keychain, no network access. RTK itself is invoked
@@ -126,6 +130,14 @@ log line confirming whether the probe succeeded.
 
 ---
 
+## Compatibility
+
+Requires TEDI **>= 0.2.9** for the generic `ctx.shell` host API. Older
+TEDI builds don't expose `registerCommandTransformer`; the extension
+detects this and shows a clear error toast instead of failing silently.
+
+---
+
 ## Local development
 
 ```bash
@@ -138,4 +150,5 @@ zip dev.zip manifest.json extension.js logo.png README.md LICENSE
 ```
 
 After install, watch TEDI's dev-tools console (`Ctrl+Shift+I`) for
-`[ext:tedi.rtk-bridge]` log lines (probe result + toast attempt).
+`[ext:tedi.rtk-bridge]` log lines (probe result, transformer
+registration, toast attempt).
