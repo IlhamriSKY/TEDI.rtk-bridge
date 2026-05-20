@@ -1,0 +1,82 @@
+name: Release
+
+# Tag-triggered release. Each `vX.Y.Z` push:
+#   1. asserts manifest.json version matches the tag
+#   2. zips the runtime files (manifest + extension.js + icon + README)
+#   3. uploads the zip to the GitHub release that TEDI's installer reads
+#      from `releases/latest`.
+#
+# No native sidecar is built - this extension is pure JS and relies on the
+# user-installed RTK binary (manual install, see README).
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to release (e.g. v0.1.0). Required when running manually."
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Package + release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF#refs/tags/}"
+          fi
+          version="${tag#v}"
+          echo "tag=$tag"         >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify manifest.json version matches the tag
+        run: |
+          set -euo pipefail
+          mver=$(jq -r '.version' manifest.json)
+          if [ "$mver" != "${{ steps.ver.outputs.version }}" ]; then
+            echo "::error::manifest.json version ($mver) does not match tag (${{ steps.ver.outputs.version }})"
+            exit 1
+          fi
+
+      - name: Package extension
+        id: pkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          out="dist/tedi.rtk-bridge-${{ steps.ver.outputs.version }}.zip"
+          # Only ship runtime files. README + LICENSE stay in the repo but
+          # are bundled too so the install card shows the right metadata.
+          # logo.png is bundled only if present (manifest has no `icon` field
+          # in v0.1; users can add a logo later and the release will include
+          # it automatically on the next tag).
+          files=(manifest.json extension.js rtk.svg README.md LICENSE)
+          if [ -f logo.png ]; then
+            files+=(logo.png)
+          fi
+          zip "$out" "${files[@]}"
+          unzip -l "$out"
+          echo "path=$out" >> "$GITHUB_OUTPUT"
+
+      - name: Create / update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          files: ${{ steps.pkg.outputs.path }}
