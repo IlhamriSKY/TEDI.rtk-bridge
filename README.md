@@ -11,10 +11,9 @@ for **60–90% token savings** on git / npm / dev operations.
 
 > [!NOTE]
 > RTK is not bundled with this extension. Install it separately and put
-> `rtk` on your PATH; the extension only detects it and surfaces savings
-> in the status bar. The actual `rtk <cmd>` prefixing is a TEDI core
-> preference (`aiShellPrefix`); see step 3 in
-> [Install](#install) below.
+> `rtk` on your PATH; the extension only detects it and toasts a setup
+> hint once. The actual `rtk <cmd>` prefixing is a TEDI core preference
+> (`aiShellPrefix`); see step 3 in [Install](#install) below.
 
 ---
 
@@ -36,8 +35,8 @@ TEDI hits `releases/latest` on this repo, downloads the `.zip` asset
 produced by the [release workflow](.github/workflows/release.yml), runs
 its standard install pipeline (size cap, path-traversal guard, manifest
 validation, fingerprint), and activates the extension. The card with
-this README's logo appears in Settings → Extensions, and the RTK status
-icon appears in the bottom-right of TEDI's status bar.
+this README's logo appears in Settings → Extensions; the card-level
+Switch is the only on/off control.
 
 ### Updating
 
@@ -66,18 +65,21 @@ Rust: shell_session_run
 rtk git status  ──▶  git  ──▶  trimmed output  ──▶  fewer tokens billed
 ```
 
-The extension itself never touches the command stream. It only:
+The extension itself never touches the command stream. On activate it:
 
-1. Probes `rtk --version` every 30 s to detect the install.
-2. Polls `rtk gain` every 60 s for cumulative token-savings.
-3. Paints a status-bar icon with the version + savings line.
-4. Toasts once on first detect with the one-line setup nudge.
+1. Runs `rtk --version` once to check that RTK is on PATH.
+2. If RTK is detected and the onboarding toast hasn't fired before,
+   shows a one-shot toast with the setup hint.
+3. Latches a flag in per-extension storage so the toast appears at most
+   once per machine, even across reinstalls.
 
-The icon reflects RTK install state only. Extension-scoped settings
-cannot read or write core TEDI preferences (by design), so the icon
-brightness is independent of the `aiShellPrefix` flag. To verify the
-bridge is fully active, look at the tooltip *and* confirm Settings →
-Agents shows `rtk ` in the prefix field.
+That's it. No polling, no status-bar icon, no `rtk gain` UI. If you
+install RTK *after* enabling the extension, toggle the extension off
+then on from Settings → Extensions to retrigger the probe.
+
+Extension-scoped settings cannot read or write core TEDI preferences
+(by design), so the extension cannot reflect or flip the
+`aiShellPrefix` flag itself. Verify it manually in Settings → Agents.
 
 ---
 
@@ -88,7 +90,6 @@ Declared in `manifest.json`:
 ```json
 "permissions": [
   "ui:toast",
-  "statusbar:write",
   "invoke:shell_run_command"
 ]
 ```
@@ -96,8 +97,7 @@ Declared in `manifest.json`:
 | Permission                  | What it lets the extension do                                                              |
 | --------------------------- | ------------------------------------------------------------------------------------------ |
 | `ui:toast`                  | Onboarding toast on first RTK detect.                                                      |
-| `statusbar:write`           | Show / hide the RTK icon in TEDI's status bar.                                             |
-| `invoke:shell_run_command`  | Run `rtk --version` and `rtk gain`. One-shot; no long-running process, no sidecar.         |
+| `invoke:shell_run_command`  | Run `rtk --version`. One-shot per activate; no long-running process, no sidecar.           |
 
 No filesystem, no keychain, no network access. RTK itself is invoked
 over local shell so no outbound traffic ever leaves the machine.
@@ -119,9 +119,10 @@ non-interactive shells inherit:
   `.bashrc` / `.zshrc` may be skipped by non-interactive shells; put
   them in `.profile` / `.zprofile` instead.
 
-If the status bar says **"RTK not detected on PATH"** while
-`rtk --version` works in your regular terminal, this is almost always
-the cause.
+If the onboarding toast never appears while `rtk --version` works in
+your regular terminal, this is almost always the cause. Check the
+dev-tools console (`Ctrl+Shift+I`) for the `[ext:tedi.rtk-bridge]`
+log line confirming whether the probe succeeded.
 
 ---
 
@@ -137,5 +138,4 @@ zip dev.zip manifest.json extension.js logo.png README.md LICENSE
 ```
 
 After install, watch TEDI's dev-tools console (`Ctrl+Shift+I`) for
-`[ext:tedi.rtk-bridge]` log lines (probe results, toast, status-bar
-updates all print there).
+`[ext:tedi.rtk-bridge]` log lines (probe result + toast attempt).

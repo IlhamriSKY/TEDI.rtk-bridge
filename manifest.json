@@ -1,15 +1,14 @@
 {
   "id": "tedi.rtk-bridge",
   "name": "RTK Bridge",
-  "version": "0.1.1",
-  "description": "Detects RTK (Rust Token Killer) on PATH and surfaces install + token-savings status in TEDI's status bar. Pair with the `aiShellPrefix = 'rtk '` preference in Settings → Agents to route TEDI's built-in AI shell tools through RTK for 60–90% token savings. Requires RTK installed separately by the user.",
+  "version": "0.1.2",
+  "description": "Detects RTK (Rust Token Killer) on PATH and toasts a one-shot setup hint. Pair with the `aiShellPrefix = 'rtk '` preference in Settings → Agents to route TEDI's built-in AI shell tools through RTK for 60–90% token savings. Requires RTK installed separately by the user.",
   "author": "IlhamRiski - ilhamriski.com",
   "homepage": "https://github.com/IlhamriSKY/TEDI.rtk-bridge",
   "icon": "logo.png",
   "main": "extension.js",
   "permissions": [
     "ui:toast",
-    "statusbar:write",
     "invoke:shell_run_command"
   ],
   "engines": {
