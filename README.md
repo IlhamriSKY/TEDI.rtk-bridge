@@ -2,7 +2,7 @@
 
 Companion extension for [TEDI](https://github.com/IlhamriSKY/TEDI) that
 routes the built-in AI agent's shell tools through
-[RTK](https://github.com/IlhamriSKY/RTK) — the Rust Token Killer proxy —
+[RTK](https://github.com/IlhamriSKY/RTK), the Rust Token Killer proxy,
 for **60–90% token savings** on git / npm / dev operations.
 
 <p align="center">
@@ -13,7 +13,7 @@ for **60–90% token savings** on git / npm / dev operations.
 > RTK is not bundled with this extension. Install it separately and put
 > `rtk` on your PATH; the extension only detects it and surfaces savings
 > in the status bar. The actual `rtk <cmd>` prefixing is a TEDI core
-> preference (`aiShellPrefix`) — see step 3 in
+> preference (`aiShellPrefix`); see step 3 in
 > [Install](#install) below.
 
 ---
@@ -73,7 +73,7 @@ The extension itself never touches the command stream. It only:
 3. Paints a status-bar icon with the version + savings line.
 4. Toasts once on first detect with the one-line setup nudge.
 
-The icon reflects RTK install state only — extension-scoped settings
+The icon reflects RTK install state only. Extension-scoped settings
 cannot read or write core TEDI preferences (by design), so the icon
 brightness is independent of the `aiShellPrefix` flag. To verify the
 bridge is fully active, look at the tooltip *and* confirm Settings →
@@ -99,7 +99,7 @@ Declared in `manifest.json`:
 | `ui:toast`                  | Onboarding toast on first RTK detect.                                                      |
 | `statusbar:write`           | Show / hide the RTK icon in TEDI's status bar.                                             |
 | `settings:read`             | Read the contributed `showSavings` toggle so it can short-circuit the gain probe.          |
-| `invoke:shell_run_command`  | Run `rtk --version` and `rtk gain`. One-shot — no long-running process, no sidecar.        |
+| `invoke:shell_run_command`  | Run `rtk --version` and `rtk gain`. One-shot; no long-running process, no sidecar.         |
 
 No filesystem, no keychain, no network access. RTK itself is invoked
 over local shell so no outbound traffic ever leaves the machine.
@@ -118,7 +118,7 @@ non-interactive shells inherit:
   inherited.
 - **macOS / Linux**: put `rtk` somewhere on `$PATH` (`/usr/local/bin`,
   `/opt/homebrew/bin`, `~/.local/bin`). PATH additions made in
-  `.bashrc` / `.zshrc` may be skipped by non-interactive shells — put
+  `.bashrc` / `.zshrc` may be skipped by non-interactive shells; put
   them in `.profile` / `.zprofile` instead.
 
 If the status bar says **"RTK not detected on PATH"** while
@@ -139,5 +139,5 @@ zip dev.zip manifest.json extension.js logo.png README.md LICENSE
 ```
 
 After install, watch TEDI's dev-tools console (`Ctrl+Shift+I`) for
-`[ext:tedi.rtk-bridge]` log lines — probe results and any toast /
-status-bar updates print there.
+`[ext:tedi.rtk-bridge]` log lines (probe results, toast, status-bar
+updates all print there).
