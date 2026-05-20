@@ -95,7 +95,7 @@ function paintStatus() {
   if (lastVersion === null) {
     safeStatusBarSet({
       id: "rtk",
-      icon: "rtk.svg",
+      icon: "logo.png",
       tooltip: "RTK not detected on PATH. Install RTK and reload TEDI.",
       tone: "warning",
     });
@@ -105,7 +105,7 @@ function paintStatus() {
     showSavings && lastSavings !== null ? ` · saved ${formatSavings(lastSavings)} tokens` : "";
   safeStatusBarSet({
     id: "rtk",
-    icon: "rtk.svg",
+    icon: "logo.png",
     tooltip: `RTK ${lastVersion}${savingsLine}\nSet 'rtk ' as the AI shell prefix in Settings → Agents to route AI shell calls through RTK.`,
     tone: "success",
   });
@@ -243,7 +243,7 @@ export async function activate(context) {
   // before the first probe completes.
   safeStatusBarSet({
     id: "rtk",
-    icon: "rtk.svg",
+    icon: "logo.png",
     tooltip: "RTK: checking installation…",
     tone: "default",
   });

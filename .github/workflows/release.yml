@@ -62,14 +62,12 @@ jobs:
           out="dist/tedi.rtk-bridge-${{ steps.ver.outputs.version }}.zip"
           # Only ship runtime files. README + LICENSE stay in the repo but
           # are bundled too so the install card shows the right metadata.
-          # logo.png is bundled only if present (manifest has no `icon` field
-          # in v0.1; users can add a logo later and the release will include
-          # it automatically on the next tag).
-          files=(manifest.json extension.js rtk.svg README.md LICENSE)
-          if [ -f logo.png ]; then
-            files+=(logo.png)
-          fi
-          zip "$out" "${files[@]}"
+          zip "$out" \
+            manifest.json \
+            extension.js \
+            logo.png \
+            README.md \
+            LICENSE
           unzip -l "$out"
           echo "path=$out" >> "$GITHUB_OUTPUT"
 

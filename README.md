@@ -5,6 +5,10 @@ Connects TEDI's built-in AI agent to [RTK](https://github.com/IlhamriSKY/RTK)
 `rtk <cmd>` instead of running raw. Typical token savings on git/npm/dev
 operations: **60–90%**.
 
+<p align="center">
+  <img src="logo.png" alt="RTK Bridge" width="128" />
+</p>
+
 > [!IMPORTANT]
 > **RTK must already be installed on your machine.** This extension only
 > *bridges* TEDI to a working RTK install — it does not bundle, install,
@@ -196,7 +200,7 @@ git clone https://github.com/IlhamriSKY/TEDI.rtk-bridge.git
 cd TEDI.rtk-bridge
 
 # Package + install into TEDI to test:
-zip dev.zip manifest.json extension.js rtk.svg README.md LICENSE
+zip dev.zip manifest.json extension.js logo.png README.md LICENSE
 # In TEDI: Settings → Extensions → From file → dev.zip
 ```
 
