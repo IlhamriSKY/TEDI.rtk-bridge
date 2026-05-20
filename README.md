@@ -2,7 +2,7 @@
 
 Companion extension for [TEDI](https://github.com/IlhamriSKY/TEDI) that
 routes the built-in AI agent's shell tools through
-[RTK](https://github.com/IlhamriSKY/RTK), the Rust Token Killer proxy,
+[RTK](https://github.com/rtk-ai/rtk), the Rust Token Killer proxy,
 for **60–90% token savings** on git / npm / dev operations.
 
 <p align="center">
