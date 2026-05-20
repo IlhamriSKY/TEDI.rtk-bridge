@@ -89,7 +89,6 @@ Declared in `manifest.json`:
 "permissions": [
   "ui:toast",
   "statusbar:write",
-  "settings:read",
   "invoke:shell_run_command"
 ]
 ```
@@ -98,7 +97,6 @@ Declared in `manifest.json`:
 | --------------------------- | ------------------------------------------------------------------------------------------ |
 | `ui:toast`                  | Onboarding toast on first RTK detect.                                                      |
 | `statusbar:write`           | Show / hide the RTK icon in TEDI's status bar.                                             |
-| `settings:read`             | Read the contributed `showSavings` toggle so it can short-circuit the gain probe.          |
 | `invoke:shell_run_command`  | Run `rtk --version` and `rtk gain`. One-shot; no long-running process, no sidecar.         |
 
 No filesystem, no keychain, no network access. RTK itself is invoked

@@ -31,12 +31,6 @@ let onboardingPending = false;
  *  `ctx.storage`. Drives the "show onboarding toast once" rule. */
 let hasShownOnboarding = false;
 
-/** Cached value of the `showSavings` setting (contributes.settings entry
- *  in manifest.json). When false, `probeGain` short-circuits and the
- *  tooltip omits the savings line. Re-read on every probeVersion tick so
- *  toggling it from Settings → Extensions takes effect within 30s. */
-let showSavings = true;
-
 /** Most recent `rtk --version` output (raw string). null = not installed. */
 let lastVersion = null;
 /** Most recent `rtk gain` numeric summary (tokens saved). null = unknown. */
@@ -101,8 +95,7 @@ function paintStatus() {
     });
     return;
   }
-  const savingsLine =
-    showSavings && lastSavings !== null ? ` · saved ${formatSavings(lastSavings)} tokens` : "";
+  const savingsLine = lastSavings !== null ? ` · saved ${formatSavings(lastSavings)} tokens` : "";
   safeStatusBarSet({
     id: "rtk",
     icon: "logo.png",
@@ -111,23 +104,8 @@ function paintStatus() {
   });
 }
 
-async function refreshShowSavings() {
-  try {
-    const v = await ctx.settings.get("showSavings");
-    // contributes.settings default is `true`, but the value is undefined
-    // until the user actually flips the toggle. Treat undefined as true.
-    showSavings = v === false ? false : true;
-  } catch (err) {
-    ctx.logger?.warn?.("settings.get showSavings failed", err);
-    showSavings = true;
-  }
-}
-
 async function probeVersion() {
   if (!active) return;
-  // Re-read showSavings each tick so toggling the Setting takes effect
-  // without an extension reload.
-  await refreshShowSavings();
   try {
     const result = await ctx.invoke("shell_run_command", {
       command: PROBE_VERSION_CMD,
@@ -169,7 +147,7 @@ async function probeVersion() {
 }
 
 async function probeGain() {
-  if (!active || lastVersion === null || !showSavings) return;
+  if (!active || lastVersion === null) return;
   try {
     const result = await ctx.invoke("shell_run_command", {
       command: PROBE_GAIN_CMD,
@@ -236,8 +214,6 @@ export async function activate(context) {
   } catch {
     hasShownOnboarding = false;
   }
-
-  await refreshShowSavings();
 
   // Paint a "checking" state immediately so the user has visual feedback
   // before the first probe completes.
