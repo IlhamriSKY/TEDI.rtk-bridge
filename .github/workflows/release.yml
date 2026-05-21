@@ -67,6 +67,7 @@ jobs:
             extension.js \
             logo.png \
             README.md \
+            CHANGELOG.md \
             LICENSE
           unzip -l "$out"
           echo "path=$out" >> "$GITHUB_OUTPUT"
