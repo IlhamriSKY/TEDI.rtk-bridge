@@ -2,6 +2,12 @@
 
 All notable changes to **TEDI RTK Bridge**. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [0.2.2] - 23-05-2026
+
+### Changed
+
+- Refreshed `logo.png` to the new TEDI extension iconography. No functional changes — the runtime code, permissions, and host APIs in use are identical to 0.2.1.
+
 ## [0.2.1] - 21-05-2026
 
 ### Changed

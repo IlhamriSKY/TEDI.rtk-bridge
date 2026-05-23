@@ -1,7 +1,7 @@
 {
   "id": "tedi.rtk-bridge",
   "name": "RTK Bridge",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Routes TEDI's built-in AI shell tools through RTK (Rust Token Killer) for 60–90% token savings on git / npm / dev operations. Detects RTK on PATH at activate; if found, registers a shell-command transformer that prefixes every AI-issued command with `rtk `. Disable or uninstall to fully revert. RTK itself must be installed separately by the user.",
   "author": "IlhamRiski - ilhamriski.com",
   "homepage": "https://github.com/IlhamriSKY/TEDI.rtk-bridge",
