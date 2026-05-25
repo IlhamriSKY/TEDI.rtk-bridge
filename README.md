@@ -100,7 +100,7 @@ Declared in `manifest.json`:
 | Permission                  | What it lets the extension do                                                              |
 | --------------------------- | ------------------------------------------------------------------------------------------ |
 | `ui:toast`                  | Onboarding toast on first RTK detect.                                                      |
-| `shell:transform`           | Register a synchronous function the host calls before every AI shell command. **High risk** — the extension chooses what actually runs. |
+| `shell:transform`           | Register a synchronous function the host calls before every AI shell command. **High risk** - the extension chooses what actually runs. |
 | `invoke:shell_run_command`  | Run `rtk --version`. One-shot per activate; no long-running process, no sidecar.           |
 
 No filesystem, no keychain, no network access. RTK itself is invoked

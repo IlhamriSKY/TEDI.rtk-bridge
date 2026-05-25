@@ -2,11 +2,17 @@
 
 All notable changes to **TEDI RTK Bridge**. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [0.2.3] - 25-05-2026
+
+### Changed
+
+- **Cosmetic em-dash sweep.** Replaced `—` (U+2014 EM DASH) with `-` (U+002D HYPHEN-MINUS) in `README.md` and `CHANGELOG.md`. No runtime code touched; functional behaviour identical to 0.2.2.
+
 ## [0.2.2] - 23-05-2026
 
 ### Changed
 
-- Refreshed `logo.png` to the new TEDI extension iconography. No functional changes — the runtime code, permissions, and host APIs in use are identical to 0.2.1.
+- Refreshed `logo.png` to the new TEDI extension iconography. No functional changes - the runtime code, permissions, and host APIs in use are identical to 0.2.1.
 
 ## [0.2.1] - 21-05-2026
 
