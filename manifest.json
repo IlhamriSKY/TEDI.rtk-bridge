@@ -1,7 +1,7 @@
 {
   "id": "tedi.rtk-bridge",
   "name": "RTK Bridge",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Routes AI shell commands through RTK (Rust Token Killer) for 60-90% token savings on git, npm, and dev operations. RTK must be installed on PATH separately.",
   "author": "IlhamRiski - ilhamriski.com",
   "homepage": "https://github.com/IlhamriSKY/TEDI.rtk-bridge",

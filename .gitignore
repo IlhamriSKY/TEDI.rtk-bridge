@@ -3,3 +3,7 @@ dist/
 *.zip
 .DS_Store
 Thumbs.db
+
+# Built bundle — generated from src/ by `node build.mjs`. NOT committed: CI
+# (release.yml) builds it into the release .zip. Dev: run `npm run build`.
+/extension.js
