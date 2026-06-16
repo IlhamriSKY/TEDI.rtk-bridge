@@ -2,43 +2,43 @@
 
 All notable changes to **TEDI RTK Bridge**. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
-## [0.2.6] - 16-06-2026
+## [0.2.6] - 2026-06-16
 
 ### Changed
 
 - **Build pipeline.** The extension is now authored as `src/index.js` and bundled into `extension.js` with esbuild (`npm run build`); the built bundle is **no longer committed** — CI (`release.yml`) builds it into the release `.zip` that users install. No behaviour change. CI actions bumped to `@v5` (Node 24).
 
-## [0.2.5] - 28-05-2026
+## [0.2.5] - 2026-05-28
 
 ### Changed
 
 - **`engines.tedi` raised to `>=0.3.9`.** The host now enforces this constraint at install time, so older TEDI builds refuse to install the extension and surface a "needs TEDI X.Y.Z" message rather than letting it run against a host that predates the current API surface.
 
-## [0.2.4] - 26-05-2026
+## [0.2.4] - 2026-05-26
 
 ### Changed
 
 - **Manifest description trimmed.** Reduced to the same "what + how" one-liner the other reference extensions use, so the *Settings → Extensions → From GitHub* install dialog reads cleanly when this card sits alongside SQL Explorer / Beautify / Discord Rich Presence. No runtime behaviour change.
 
-## [0.2.3] - 25-05-2026
+## [0.2.3] - 2026-05-25
 
 ### Changed
 
 - **Cosmetic em-dash sweep.** Replaced `—` (U+2014 EM DASH) with `-` (U+002D HYPHEN-MINUS) in `README.md` and `CHANGELOG.md`. No runtime code touched; functional behaviour identical to 0.2.2.
 
-## [0.2.2] - 23-05-2026
+## [0.2.2] - 2026-05-23
 
 ### Changed
 
 - Refreshed `logo.png` to the new TEDI extension iconography. No functional changes - the runtime code, permissions, and host APIs in use are identical to 0.2.1.
 
-## [0.2.1] - 21-05-2026
+## [0.2.1] - 2026-05-21
 
 ### Changed
 
 - README points to the canonical RTK repo at [rtk-ai/rtk](https://github.com/rtk-ai/rtk) instead of the old `IlhamriSKY/RTK` slug.
 
-## [0.2.0] - 20-05-2026
+## [0.2.0] - 2026-05-20
 
 ### Changed
 
@@ -54,7 +54,7 @@ All notable changes to **TEDI RTK Bridge**. Format follows [Keep a Changelog](ht
 - Dependency on `aiShellPrefix` core preference (it was removed from TEDI core in 0.2.9).
 - Unused `statusbar:write` and `settings:*` permissions.
 
-## [0.1.2] - 20-05-2026
+## [0.1.2] - 2026-05-20
 
 ### Removed
 
@@ -66,13 +66,13 @@ All notable changes to **TEDI RTK Bridge**. Format follows [Keep a Changelog](ht
 
 - Dropped `statusbar:write`.
 
-## [0.1.1] - 20-05-2026
+## [0.1.1] - 2026-05-20
 
 ### Removed
 
 - Inner **Show savings in status bar tooltip** toggle. The card-level Switch in Settings → Extensions is the only on / off control.
 
-## [0.1.0] - 20-05-2026
+## [0.1.0] - 2026-05-20
 
 ### Added
 
