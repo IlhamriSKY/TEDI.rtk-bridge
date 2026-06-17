@@ -31,16 +31,13 @@ card. If a new release exists, click **Update** to reinstall in place.
 
 ## How it works
 
-```
-TEDI AI agent
-    │
-    │ tool: bash_run({ command: "git status" })
-    ▼
-applyShellTransformers(cmd, "bash")
-    │
-    │ this extension's transformer prefixes "rtk "
-    ▼
-rtk git status   →   git status   →   compressed output   →   AI
+```mermaid
+flowchart TD
+    A["TEDI AI agent"] -->|"tool: bash_run, command 'git status'"| B["applyShellTransformers(cmd, 'bash')"]
+    B -->|"this extension's transformer prefixes 'rtk '"| C["rtk git status"]
+    C --> D["git status runs"]
+    D --> E["compressed output"]
+    E --> F["back to the AI"]
 ```
 
 On activate:
