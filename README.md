@@ -43,13 +43,37 @@ flowchart TD
 On activate:
 
 1. Runs `rtk --version` once to confirm RTK is on `PATH`.
-2. If present, registers a `ctx.shell.registerCommandTransformer` that wraps
-   every AI-issued shell command with `rtk `.
-3. Shows a one-time onboarding toast (latched so it never repeats on the same
+2. If present, reads the active workspace's `.tedi/rtk.json` (if any), then
+   registers a `ctx.shell.registerCommandTransformer` that wraps each
+   AI-issued shell command with the configured prefix.
+3. Re-reads the config whenever the active workspace changes.
+4. Shows a one-time onboarding toast (latched so it never repeats on the same
    machine).
 
-On disable or uninstall, the transformer is dropped and TEDI's shell tools go
-back to running commands raw. No core TEDI code is RTK-aware.
+On disable or uninstall, the transformer and the workspace subscription are
+dropped and TEDI's shell tools go back to running commands raw. No core TEDI
+code is RTK-aware.
+
+## Configuration
+
+Settings are per project, in `<workspace>/.tedi/rtk.json` (the same `.tedi/`
+folder TEDI uses for memory and skills). Every key is optional:
+
+```jsonc
+{
+  "enabled": true,           // false turns RTK off for this project
+  "command": "rtk",          // the prefix / binary to route through
+  "skip": ["cd", "export"]   // first-token commands left untouched
+}
+```
+
+- With **no** `.tedi/rtk.json`, every command is wrapped with `rtk` (the
+  original behavior), so RTK works out of the box once installed.
+- The configured `command` is always skipped implicitly, so a meta call like
+  `rtk gain` is never double-wrapped.
+- The file is read at activate and re-read on workspace switch. After editing
+  it in the open project, toggle the extension off / on (or reopen the
+  workspace) to pick up the change.
 
 ## Permissions
 
@@ -58,9 +82,10 @@ back to running commands raw. No core TEDI code is RTK-aware.
 | `ui:toast` | Onboarding toast on first RTK detect. |
 | `shell:transform` | Rewrite every AI shell command. **High risk:** the extension chooses what runs. |
 | `invoke:shell_run_command` | Run `rtk --version` once per activate. |
+| `invoke:fs_read_file` | Read `<workspace>/.tedi/rtk.json` for per-project settings. |
 
-No filesystem, no keychain, no network. RTK itself is invoked over local shell
-only.
+Reads only `<workspace>/.tedi/rtk.json`. No keychain, no network. RTK itself is
+invoked over local shell only.
 
 ## Development
 

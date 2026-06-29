@@ -1,6 +1,6 @@
 {
   "name": "tedi-rtk-bridge",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Build tooling for the TEDI RTK Bridge extension. The shipped artifact is the bundled extension.js (built in CI into the release .zip, not committed); source lives in src/.",

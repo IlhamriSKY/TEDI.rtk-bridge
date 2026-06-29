@@ -2,6 +2,16 @@
 
 All notable changes to **TEDI RTK Bridge**. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [0.3.0] - 2026-06-29
+
+### Added
+
+- **Per-project configuration via `.tedi/rtk.json`.** The bridge now reads the active workspace's `.tedi/rtk.json` (TEDI's project-local config folder, alongside memory and skills) to drive the rewrite: `enabled` toggles wrapping per project, `command` sets the prefix / binary, and `skip` lists first-token commands to leave untouched. With no file present the behavior is unchanged - every command is wrapped with `rtk`. The configured prefix is always skip-listed, so meta calls like `rtk gain` are no longer double-wrapped. Config is read at activate and re-read on workspace switch.
+
+### Permissions
+
+- Added `invoke:fs_read_file` to read `<workspace>/.tedi/rtk.json`.
+
 ## [0.2.6] - 2026-06-16
 
 ### Changed

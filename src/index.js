@@ -1,34 +1,48 @@
-// TEDI RTK Bridge - registers a shell-command transformer that prefixes
-// AI-issued commands with `rtk `, routing them through RTK (Rust Token
-// Killer) for token-trimmed output.
+// TEDI RTK Bridge - routes the AI agent's shell commands through RTK (Rust
+// Token Killer) for token-trimmed output, configurable per project via a local
+// `.tedi/rtk.json` file (the same convention TEDI uses for memory and skills).
 //
-// Architecture (v0.2 onwards):
-//   - TEDI core exposes a generic `ctx.shell.registerCommandTransformer`
-//     hook. Zero RTK-specific code lives in the host; the bridge fully
-//     owns the prefix logic and re-registers it on every activate.
-//   - On activate, the extension probes `rtk --version` once. If RTK is
-//     on PATH, it registers a transformer that returns "rtk " + cmd for
-//     every AI shell call (bash_run, bash_background, run_in_terminal,
-//     suggest_command). If RTK isn't on PATH, the extension activates
-//     but registers nothing - the AI keeps working with raw commands.
-//   - On deactivate / uninstall, TEDI's host runs the disposer returned
-//     by registerCommandTransformer, which clears the entry from the
-//     registry. The transform chain returns to passthrough cleanly with
-//     no leftover state.
-//   - First-detect onboarding toast nudges the user that RTK is wired
-//     up. Latched in per-extension storage so it appears at most once
-//     per machine.
+// Architecture:
+//   - TEDI core exposes a generic `ctx.shell.registerCommandTransformer` hook
+//     and a read-only app context (`ctx.app`). No RTK-specific code lives in
+//     the host; this bridge owns the prefix logic and the configuration.
+//   - On activate it probes `rtk --version` once. If RTK is on PATH it reads the
+//     active workspace's config, then registers a synchronous transformer that
+//     wraps each AI shell command with the configured prefix. The config is
+//     re-read whenever the active workspace changes.
+//   - On deactivate / uninstall the host disposes the transformer and the
+//     context subscription; the transform chain returns to passthrough.
+//
+// Configuration - `<workspace>/.tedi/rtk.json` (every key optional):
+//   {
+//     "enabled": true,        // false disables wrapping for this project
+//     "command": "rtk",       // the prefix / binary to route through
+//     "skip": ["cd", "export"] // first-token commands to leave untouched
+//   }
+// A project with no `.tedi/rtk.json` keeps the original behavior: every command
+// is wrapped with `rtk`. The configured prefix is always skip-listed implicitly,
+// so a meta call like `rtk gain` is never double-wrapped.
 //
 // RTK install: out of scope. See README.
 
 const VERIFY_TIMEOUT_SECS = 5;
 const PROBE_VERSION_CMD = "rtk --version";
+const CONFIG_REL_PATH = ".tedi/rtk.json";
+
+/** Behavior when no project config is present: wrap every command with `rtk`. */
+const DEFAULT_CONFIG = { enabled: true, command: "rtk", skip: [] };
 
 let ctx = null;
-/** Disposer returned by `ctx.shell.registerCommandTransformer`. Captured
- *  defensively even though the host auto-runs it on deactivate, so a
- *  future re-probe path can re-register cleanly. */
+/** Disposers from the host. Captured even though the host auto-runs them on
+ *  deactivate, so teardown is explicit and idempotent. */
 let disposeTransformer = null;
+let disposeContext = null;
+/** Active rewrite config. The synchronous transformer reads this; file reads
+ *  never happen on the command hot path, only on activate / workspace change. */
+let config = DEFAULT_CONFIG;
+/** Workspace root the current config was loaded for, so context-change events
+ *  that don't move the workspace skip a redundant re-read. */
+let loadedRoot = null;
 
 async function probeOnce() {
   try {
@@ -39,29 +53,61 @@ async function probeOnce() {
     });
     const stdout = String(result?.stdout ?? "").trim();
     if (result?.exit_code === 0 && stdout) {
-      const firstLine = stdout.split(/\r?\n/)[0].trim();
-      return firstLine.replace(/^rtk\s+/i, "");
+      return stdout.split(/\r?\n/)[0].trim().replace(/^rtk\s+/i, "");
     }
   } catch (err) {
-    // ENOENT / command-not-found surfaces here on most platforms.
-    // Treat as not-installed without spamming the user with an error.
+    // ENOENT / command-not-found surfaces here on most platforms. Treat as
+    // not-installed without spamming the user with an error.
     ctx.logger?.info?.("rtk --version not available", err);
   }
   return null;
 }
 
+/** Coerce arbitrary parsed JSON into a valid config, filling defaults so a
+ *  partial or malformed file can never break the transformer. */
+function normalizeConfig(raw) {
+  if (!raw || typeof raw !== "object") return DEFAULT_CONFIG;
+  const command =
+    typeof raw.command === "string" && raw.command.trim() ? raw.command.trim() : "rtk";
+  const skip = Array.isArray(raw.skip)
+    ? raw.skip.filter((s) => typeof s === "string" && s.length > 0)
+    : [];
+  // `enabled` defaults to true: a file that omits it still opts the project in.
+  return { enabled: raw.enabled !== false, command, skip };
+}
+
+/** Read `<root>/.tedi/rtk.json`. A missing, unreadable, or invalid file falls
+ *  back to the default (wrap everything), so RTK keeps working with no config. */
+async function loadConfig(root) {
+  if (!root) return DEFAULT_CONFIG;
+  const path = `${root.replace(/[\\/]+$/, "")}/${CONFIG_REL_PATH}`;
+  try {
+    const res = await ctx.invoke("fs_read_file", { path });
+    if (!res || res.kind !== "text") return DEFAULT_CONFIG;
+    return normalizeConfig(JSON.parse(res.content));
+  } catch {
+    return DEFAULT_CONFIG;
+  }
+}
+
+/** Reload config for `root` unless it is already the loaded one. */
+async function refreshConfig(root) {
+  if (root === loadedRoot) return;
+  loadedRoot = root;
+  config = await loadConfig(root);
+}
+
 /**
- * Sync transformer the host calls for every AI shell command. Prefixes
- * with "rtk " unconditionally - the `kind` arg ("bash" | "terminal")
- * is ignored because RTK rewraps identically in both code paths.
- *
- * The transformer must stay synchronous: it sits in the AI tool hot
- * path and an async hop would add a roundtrip per command. Async work
- * (probing RTK) happens once at activate; the result decides whether
- * to register at all.
+ * Synchronous transformer the host calls for every AI shell command (both the
+ * hidden `bash` kind and the visible `terminal` kind). Wraps the command with
+ * the configured prefix unless wrapping is disabled, the first token is in
+ * `skip`, or it already starts with the prefix (which prevents `rtk rtk ...`).
  */
-function rtkTransformer(command /* , kind */) {
-  return `rtk ${command}`;
+function rtkTransformer(command) {
+  if (!config.enabled) return command;
+  const firstToken = command.trimStart().split(/\s+/)[0] ?? "";
+  if (firstToken === config.command || config.skip.includes(firstToken)) return command;
+  return `${config.command} ${command}`;
 }
 
 export async function activate(context) {
@@ -71,8 +117,8 @@ export async function activate(context) {
   try {
     hasShownOnboarding = (await ctx.storage.get("onboarding_shown")) === true;
   } catch {
-    // Storage unavailable; fall through and let the toast fire. Worst
-    // case the user sees the onboarding hint twice across reinstalls.
+    // Storage unavailable; fall through and let the toast fire. Worst case the
+    // user sees the onboarding hint twice across reinstalls.
   }
 
   const version = await probeOnce();
@@ -84,18 +130,24 @@ export async function activate(context) {
   }
   ctx.logger?.info?.(`RTK ${version} detected; registering shell transformer`);
 
-  // Hook the host's generic transformer registry. From here on every
-  // AI shell call passes through `rtkTransformer` until the extension
-  // is disabled / uninstalled (the host auto-disposes for us).
+  // Load the active workspace's config before registering, so the first command
+  // already runs under the project's settings. Then track workspace switches:
+  // onContextChange fires once immediately on subscribe (a no-op here since the
+  // root is unchanged) and again on every later switch.
+  await refreshConfig(ctx.app.getContext().workspaceCwd ?? null);
+  disposeContext = ctx.app.onContextChange((c) => {
+    void refreshConfig(c.workspaceCwd ?? null);
+  });
+
   try {
     disposeTransformer = ctx.shell.registerCommandTransformer(rtkTransformer);
   } catch (err) {
-    // Permission error or older TEDI without the API. Surface clearly so
-    // the user knows nothing is being wrapped.
+    // Permission error or older TEDI without the API. Surface clearly so the
+    // user knows nothing is being wrapped.
     ctx.logger?.error?.("registerCommandTransformer failed", err);
     try {
       ctx.ui.toast(
-        "RTK Bridge: this TEDI build doesn't expose ctx.shell. Update TEDI to >= 0.2.9 or grant `shell:transform` permission.",
+        "RTK Bridge: this TEDI build doesn't expose ctx.shell. Update TEDI to >= 0.3.9 or grant `shell:transform` permission.",
         { variant: "error" },
       );
     } catch {
@@ -107,7 +159,7 @@ export async function activate(context) {
   if (hasShownOnboarding) return;
   try {
     ctx.ui.toast(
-      `RTK ${version} detected. AI shell commands are now routed through RTK for token savings.`,
+      `RTK ${version} detected. AI shell commands are routed through RTK; configure it per project in .tedi/rtk.json.`,
       { variant: "success" },
     );
   } catch (err) {
@@ -117,9 +169,16 @@ export async function activate(context) {
 }
 
 export async function deactivate() {
-  // The host auto-clears our transformer entry on deactivate, but call
-  // the captured disposer too for safety - it's idempotent so the
-  // double-clear is harmless.
+  // The host auto-clears both registrations on deactivate; call the captured
+  // disposers too for safety - they are idempotent so the double-clear is fine.
+  if (typeof disposeContext === "function") {
+    try {
+      disposeContext();
+    } catch {
+      // ignore - already disposed
+    }
+    disposeContext = null;
+  }
   if (typeof disposeTransformer === "function") {
     try {
       disposeTransformer();
@@ -128,5 +187,7 @@ export async function deactivate() {
     }
     disposeTransformer = null;
   }
+  config = DEFAULT_CONFIG;
+  loadedRoot = null;
   ctx = null;
 }
