@@ -4,7 +4,7 @@
   "version": "0.3.0",
   "description": "Routes AI shell commands through RTK (Rust Token Killer) for 60-90% token savings, configurable per project via .tedi/rtk.json. RTK must be installed on PATH separately.",
   "author": "IlhamRiski - ilhamriski.com",
-  "homepage": "https://github.com/IlhamriSKY/TEDI.rtk-bridge",
+  "homepage": "https://tedi.ilhamriski.com/",
   "icon": "logo.png",
   "main": "extension.js",
   "permissions": [

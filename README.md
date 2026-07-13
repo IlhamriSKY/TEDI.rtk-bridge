@@ -1,6 +1,6 @@
 # TEDI RTK Bridge
 
-Routes the built-in AI agent's shell tools in [TEDI](https://github.com/IlhamriSKY/TEDI)
+Routes the built-in AI agent's shell tools in [TEDI](https://tedi.ilhamriski.com/)
 through [RTK](https://github.com/rtk-ai/rtk), the Rust Token Killer proxy. RTK
 filters and compresses common dev-tool output (git, npm, docker) before it
 reaches the AI, saving 60-90% of tokens on shell operations.
