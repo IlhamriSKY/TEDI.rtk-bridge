@@ -2,7 +2,7 @@
   "$schema": "./manifest.schema.json",
   "id": "tedi.rtk-bridge",
   "name": "RTK Bridge",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Routes AI shell commands through RTK (Rust Token Killer) for 60-90% token savings, configurable per project via .tedi/rtk.json. RTK must be installed on PATH separately.",
   "author": "IlhamRiski - ilhamriski.com",
   "homepage": "https://tedi.ilhamriski.com/",
