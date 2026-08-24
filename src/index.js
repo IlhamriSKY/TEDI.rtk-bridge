@@ -32,6 +32,7 @@ const CONFIG_REL_PATH = ".tedi/rtk.json";
 /** Behavior when no project config is present: wrap every command with `rtk`. */
 const DEFAULT_CONFIG = { enabled: true, command: "rtk", skip: [] };
 
+/** @type {import("../tedi").ExtensionContext | null} */
 let ctx = null;
 /** Disposers from the host. Captured even though the host auto-runs them on
  *  deactivate, so teardown is explicit and idempotent. */
@@ -110,6 +111,7 @@ function rtkTransformer(command) {
   return `${config.command} ${command}`;
 }
 
+/** @param {import("../tedi").ExtensionContext} context */
 export async function activate(context) {
   ctx = context;
 

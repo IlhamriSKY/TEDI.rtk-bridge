@@ -1,4 +1,5 @@
 {
+  "$schema": "./manifest.schema.json",
   "id": "tedi.rtk-bridge",
   "name": "RTK Bridge",
   "version": "0.3.1",
