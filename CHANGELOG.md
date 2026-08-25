@@ -2,6 +2,17 @@
 
 All notable changes to **TEDI RTK Bridge**. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [0.4.1] - 25-08-2026
+
+### Added
+
+- **The bridge is visible now, to you and to the agent.** It used to run completely unannounced: asking TEDI's own AI "can you access rtk?" sent it grepping the repo, listing directories and reading two READMEs before it could answer, because nothing in its context said RTK was installed, active, or already rewriting the shell commands it was about to run. Two surfaces fix that, both built from one snapshot so they cannot disagree. A **status-bar badge** shows the number of routed commands, with a tooltip naming every one of them, the prefix in use, and whether the count was narrowed by the `PATH` probe; it goes grey when a project turns wrapping off. And an **`rtk_status` AI tool** is contributed to the agent - the point is less the call than the description, which sits in the model's tool list on every turn and states that RTK is active, that commands are prefixed automatically, and that it must not add the prefix itself. Calling it returns the exact routed list. Neither surface appears when RTK is absent, so nothing can claim the bridge is handling commands when it is not.
+
+### Changed
+
+- **New permission: `statusbar:write`,** for the badge. Updating from 0.4.0 shows it in the install review dialog as a newly requested permission; approving it is what turns the badge on. Everything else works without it - a host that refuses it logs a warning and keeps routing commands.
+- **A refused status item is logged at `warn`, not `info`.** `info` is dropped in release builds, so the first attempt at this failed silently: the badge simply never appeared and the console said nothing about why. That is exactly the case the log line exists for.
+
 ## [0.4.0] - 2026-08-25
 
 ### Fixed

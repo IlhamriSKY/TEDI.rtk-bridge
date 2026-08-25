@@ -35,6 +35,13 @@ import {
   probeCommand,
   transform,
 } from "./transform.js";
+import {
+  AI_TOOL_NAME,
+  aiToolDescription,
+  describe,
+  removeStatusItem,
+  renderStatusItem,
+} from "./present.js";
 
 const VERIFY_TIMEOUT_SECS = 5;
 const PROBE_VERSION_CMD = "rtk --version";
@@ -59,6 +66,9 @@ let refreshSeq = 0;
  *  availability probe found on PATH. Falls back to the full list if the probe
  *  cannot run, which is exactly the pre-probe behavior. */
 let wrapBase = DEFAULT_WRAP;
+/** Everything the two visible surfaces need, so they cannot describe a state
+ *  the transformer is not actually in. `null` until RTK is confirmed. */
+let presence = null;
 
 async function probeOnce() {
   try {
@@ -148,7 +158,51 @@ async function refreshConfig(root) {
   const seq = ++refreshSeq;
   const next = await loadConfig(root);
   // A later switch started while this read was in flight - it owns `config`.
-  if (seq === refreshSeq) config = next;
+  if (seq !== refreshSeq) return;
+  config = next;
+  // A project can turn wrapping off or change the routed set, so the badge is
+  // re-rendered from the config that actually won, not from the default.
+  if (presence) renderStatusItem(ctx, { ...presence, config });
+}
+
+/**
+ * Lend the agent one read-only tool. The point is less the call than the
+ * description: a contributed tool's description sits in the model's tool list
+ * every turn, so "RTK is on and already rewriting your commands" becomes
+ * something it knows rather than something it has to go and discover.
+ *
+ * Registered from `activate` rather than the manifest, and only once RTK is
+ * confirmed - a manifest contribution is seeded before `activate` runs, so a
+ * throw would publish a tool with no handler, and an unconditional one would
+ * tell the agent RTK is active on a machine that does not have it.
+ */
+function publishAiTool() {
+  const snapshot = describe(presence);
+  try {
+    ctx.contribute.aiTools([
+      {
+        name: AI_TOOL_NAME,
+        description: aiToolDescription({
+          routed: snapshot.routed,
+          prefix: config.command,
+        }),
+        parameters: { type: "object", properties: {}, additionalProperties: false },
+      },
+    ]);
+    ctx.registerAiToolHandler(AI_TOOL_NAME, () => {
+      const now = describe({ ...presence, config });
+      return {
+        active: config.enabled,
+        version: presence.version,
+        prefix: config.command,
+        routed: now.routed,
+        source: now.source,
+        note: "These commands are prefixed automatically. Do not add the prefix yourself.",
+      };
+    });
+  } catch (err) {
+    ctx.logger?.warn?.("could not contribute the rtk_status tool", err);
+  }
 }
 
 /** @param {import("../tedi").ExtensionContext} context */
@@ -175,6 +229,8 @@ export async function activate(context) {
   ctx.logger?.info?.(
     `RTK ${version} detected; routing ${wrapBase.length}/${DEFAULT_WRAP.length} tools (${wrapBase.join(", ")})`,
   );
+
+  presence = { version, probeNarrowed: available !== null, total: DEFAULT_WRAP.length, config };
 
   // Load the active workspace's config before registering, so the first command
   // already runs under the project's settings. Then track workspace switches:
@@ -203,6 +259,12 @@ export async function activate(context) {
     }
     return;
   }
+
+  // Both surfaces go up only after the transformer really registered, so
+  // neither can claim RTK is handling commands when nothing is.
+  presence = { ...presence, config };
+  renderStatusItem(ctx, presence);
+  publishAiTool();
 
   if (hasShownOnboarding) return;
   try {
@@ -235,6 +297,11 @@ export async function deactivate() {
     }
     disposeTransformer = null;
   }
+  // The host clears contributed AI tools and status items on deactivate; the
+  // explicit remove keeps the badge from lingering if only this half is torn
+  // down (a reload writes a new bundle without a full uninstall).
+  if (ctx) removeStatusItem(ctx);
+  presence = null;
   config = DEFAULT_CONFIG;
   wrapBase = DEFAULT_WRAP;
   loadedRoot = null;

@@ -33,12 +33,38 @@ const test = async (name, fn) => {
  */
 function makeCtx({ onPath = ["rtk", ...DEFAULT_WRAP], platform = "linux", configFile = null } = {}) {
   const calls = [];
-  const state = { transformer: null, toasts: [], logs: [], disposed: 0 };
+  const state = {
+    transformer: null,
+    toasts: [],
+    logs: [],
+    disposed: 0,
+    statusItem: null,
+    statusRemoved: 0,
+    aiTools: [],
+    aiHandlers: {},
+  };
   return {
     state,
     calls,
     ctx: {
       os: { platform, arch: "x86_64" },
+      statusBar: {
+        setItem: (item) => {
+          state.statusItem = item;
+        },
+        removeItem: () => {
+          state.statusRemoved += 1;
+          state.statusItem = null;
+        },
+      },
+      contribute: {
+        aiTools: (items) => {
+          state.aiTools = items;
+        },
+      },
+      registerAiToolHandler: (name, fn) => {
+        state.aiHandlers[name] = fn;
+      },
       storage: { get: async () => true, set: async () => {} },
       logger: {
         info: (...a) => state.logs.push(a.join(" ")),
@@ -169,6 +195,76 @@ await test("deactivate releases both host registrations", async () => {
   await ext.deactivate();
   assert.equal(h.state.disposed, 2, "context subscription and transformer must both be dropped");
   // Idempotent: the host also clears these itself.
+  await ext.deactivate();
+});
+
+// ------------------------- Being visible at all ------------------------------
+// The bridge used to be invisible: asking TEDI's own AI "can you access rtk?"
+// sent it grepping the repo and reading two READMEs before it could answer.
+
+await test("an active bridge shows a status-bar badge with the routed count", async () => {
+  const h = makeCtx({ onPath: ["rtk", "git", "npm", "docker"] });
+  await ext.activate(h.ctx);
+  const item = h.state.statusItem;
+  assert.ok(item, "no status item was published");
+  assert.equal(item.id, "rtk");
+  assert.equal(item.tone, "success");
+  assert.equal(item.label, "3", "badge must count the routed tools, not the defaults");
+  assert.match(item.tooltip, /RTK 0\.43\.0 is routing 3 commands/);
+  // The detail has to name the tools, or the badge says nothing actionable.
+  assert.ok(JSON.stringify(item.detail).includes("git"), item.detail);
+  await ext.deactivate();
+  assert.ok(h.state.statusRemoved >= 1, "badge must be removed on deactivate");
+});
+
+await test("the badge follows a project that turns wrapping off", async () => {
+  const h = makeCtx({ onPath: ["rtk", "git"], configFile: { enabled: false } });
+  await ext.activate(h.ctx);
+  assert.equal(h.state.statusItem.tone, "default", "a disabled project must not read as active");
+  assert.match(h.state.statusItem.tooltip, /wrapping is off/);
+  await ext.deactivate();
+});
+
+await test("the agent is told RTK is on without having to go looking", async () => {
+  const h = makeCtx({ onPath: ["rtk", "git", "npm"] });
+  await ext.activate(h.ctx);
+  assert.equal(h.state.aiTools.length, 1);
+  const tool = h.state.aiTools[0];
+  assert.equal(tool.name, "rtk_status");
+  // The description is the payload: it is in the model's tool list every turn.
+  assert.match(tool.description, /RTK \(Rust Token Killer\) is ACTIVE/);
+  assert.match(tool.description, /Do NOT type `rtk` yourself/);
+  assert.match(tool.description, /\bgit\b/);
+  assert.ok(tool.parameters && tool.parameters.type === "object");
+  // And the handler answers with the live set, not a copy made at activate.
+  const out = await h.state.aiHandlers.rtk_status({});
+  assert.equal(out.active, true);
+  assert.equal(out.prefix, "rtk");
+  assert.deepEqual(out.routed.sort(), ["git", "npm"]);
+  await ext.deactivate();
+});
+
+await test("no RTK means no badge and no tool claiming otherwise", async () => {
+  const h = makeCtx();
+  h.ctx.invoke = async (cmd) => {
+    if (cmd === "shell_run_command") return { stdout: "", exit_code: 127 };
+    throw new Error("ENOENT");
+  };
+  await ext.activate(h.ctx);
+  assert.equal(h.state.statusItem, null, "a badge would claim RTK is running when it is not");
+  assert.equal(h.state.aiTools.length, 0, "the tool description asserts RTK is active");
+  await ext.deactivate();
+});
+
+await test("a host without statusbar:write still routes commands", async () => {
+  // The permission is new in 0.4.1; an install that predates it must degrade
+  // to "works but cannot show itself", not to a dead activate.
+  const h = makeCtx({ onPath: ["rtk", "git"] });
+  h.ctx.statusBar.setItem = () => {
+    throw new Error("permission denied: statusbar:write");
+  };
+  await ext.activate(h.ctx);
+  assert.equal(h.state.transformer("git status"), "rtk git status");
   await ext.deactivate();
 });
 
