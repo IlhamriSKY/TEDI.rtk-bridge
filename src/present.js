@@ -16,15 +16,47 @@
 // Pure apart from the two `ctx` calls at the bottom, so `describe` is testable
 // on its own.
 
+/**
+ * The popover renderer is unforgiving about width and the first draft ignored
+ * it: `label` gets a fixed `w-14` column, and `value` and `note` are both
+ * `shrink-0` on a `leading-none` row. So a label longer than about eight
+ * characters wraps onto two lines, and a long note does not wrap at all - it
+ * runs straight off the edge and is clipped. The 47-name routed list did
+ * exactly that.
+ *
+ * Hence: short labels, the count as a single `19 / 47` value instead of a
+ * number plus a note repeating it, and a length-budgeted preview of the list
+ * rather than the whole thing. The full list stays available through the
+ * `rtk_status` tool, which has no width to respect.
+ */
+const PREVIEW_BUDGET = 44;
+
+/** As many names as fit in `PREVIEW_BUDGET`, then `+N`. Never returns a string
+ *  that would overflow the row, however many tools are routed. */
+export function previewList(routed, budget = PREVIEW_BUDGET) {
+  const shown = [];
+  let width = 0;
+  for (const name of routed) {
+    const next = width + name.length + (shown.length ? 1 : 0);
+    // Leave room for the "+N" that will follow if anything is left over.
+    if (next > budget - 5 && shown.length) break;
+    shown.push(name);
+    width = next;
+  }
+  const rest = routed.length - shown.length;
+  return rest > 0 ? `${shown.join(" ")} +${rest}` : shown.join(" ");
+}
+
 /** Text for both surfaces, from one snapshot. */
 export function describe({ version, config, probeNarrowed, total }) {
   const routed = [...config.wrap].sort();
-  const source = probeNarrowed
-    ? `${routed.length} of ${total} known tools - the rest are not on PATH`
-    : `${routed.length} tools - PATH could not be probed, so none were ruled out`;
   return {
     routed,
-    source,
+    // `19 / 47` reads as one fact. The old row put `19` in the value and then
+    // "19 of 38 known tools…" in the note, printing the same number twice.
+    count: `${routed.length} / ${total}`,
+    scope: probeNarrowed ? "found on PATH" : "PATH not probed",
+    preview: previewList(routed),
     label: String(routed.length),
     tooltip: config.enabled
       ? `RTK ${version} is routing ${routed.length} commands`
@@ -56,28 +88,31 @@ export const STATUS_ITEM_ID = "rtk";
 
 /** Push the status-bar item. Safe to call repeatedly; the host keys on `id`. */
 export function renderStatusItem(ctx, snapshot) {
-  const { routed, source, label, tooltip } = describe(snapshot);
+  const { count, scope, preview, label, tooltip } = describe(snapshot);
+  const on = snapshot.config.enabled;
   try {
     ctx.statusBar.setItem({
       id: STATUS_ITEM_ID,
       icon: "lucide:Filter",
       kind: "status",
-      tone: snapshot.config.enabled ? "success" : "default",
+      tone: on ? "success" : "default",
       label,
       tooltip,
       detail: {
         title: `RTK ${snapshot.version}`,
-        rows: [
-          { label: "Routed", value: label, note: source },
-          { label: "Prefix", value: snapshot.config.command },
-          {
-            label: snapshot.config.enabled ? "AI shell commands" : "Wrapping",
-            note: snapshot.config.enabled
-              ? "routed through RTK automatically"
-              : "off for this project (.tedi/rtk.json)",
-          },
-          { label: "", note: routed.join(" ") },
-        ],
+        // Every label here is <= 7 characters so it fits the fixed `w-14`
+        // column on one line, and every note is short enough not to be clipped.
+        rows: on
+          ? [
+              { label: "Routed", value: count, note: scope },
+              { label: "Prefix", value: snapshot.config.command },
+              { label: "Applies", note: "automatically, to AI commands" },
+              { label: "", note: preview },
+            ]
+          : [
+              { label: "Routed", value: `0 / ${count.split(" / ")[1]}` },
+              { label: "Off", note: "disabled in .tedi/rtk.json" },
+            ],
       },
     });
   } catch (err) {

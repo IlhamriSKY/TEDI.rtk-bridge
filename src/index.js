@@ -196,7 +196,10 @@ function publishAiTool() {
         version: presence.version,
         prefix: config.command,
         routed: now.routed,
-        source: now.source,
+        // The badge can only show a preview; this is the place with no width
+        // limit, so it carries the whole list and the qualifier.
+        count: now.count,
+        scope: now.scope,
         note: "These commands are prefixed automatically. Do not add the prefix yourself.",
       };
     });

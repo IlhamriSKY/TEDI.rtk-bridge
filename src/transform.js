@@ -24,13 +24,18 @@
  * Every entry is a real executable on both Unix and Windows, so the
  * program-not-found trap above cannot fire on one.
  *
- * Derived from `rtk --help` (rtk 0.43). Extend it per project with `wrap`.
+ * Derived from `rtk --help` (rtk 0.45). Extend it per project with `wrap`.
+ * A tool listed here but not installed is dropped by the PATH probe below, so
+ * the list can be generous without costing anything at runtime.
  */
 export const DEFAULT_WRAP = [
   // VCS + forge CLIs. The single biggest win: `git log -p`, `git diff`, `git show`.
   "git", "gh", "glab", "gt",
   // Package managers / runtimes.
-  "npm", "npx", "pnpm", "cargo", "go", "pip", "dotnet", "mvn", "gradlew",
+  "npm", "npx", "pnpm", "cargo", "go", "pip", "uv", "dotnet", "mvn", "gradlew", "sbt",
+  // PHP, added by rtk 0.44. `artisan` needs no entry: it is run as
+  // `php artisan …`, so the first token is already `php`.
+  "php", "phpunit", "phpstan", "pest", "paratest", "pint", "ecs",
   // Containers + cloud.
   "docker", "kubectl", "oc", "aws", "psql",
   // Build / typecheck / codegen.

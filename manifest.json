@@ -2,7 +2,7 @@
   "$schema": "./manifest.schema.json",
   "id": "tedi.rtk-bridge",
   "name": "RTK Bridge",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Routes the AI agent's git, npm, docker and other tool commands through RTK (Rust Token Killer) for 60-90% token savings, shows a status-bar indicator when it is active, and tells the agent so it never has to go looking. Configurable per project via .tedi/rtk.json. RTK must be installed on PATH separately.",
   "author": "IlhamRiski - ilhamriski.com",
   "homepage": "https://tedi.ilhamriski.com/",

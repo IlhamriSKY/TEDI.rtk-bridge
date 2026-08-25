@@ -2,6 +2,16 @@
 
 All notable changes to **TEDI RTK Bridge**. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [0.4.2] - 25-08-2026
+
+### Fixed
+
+- **The badge's tooltip spilled out of its own popover.** The renderer gives `label` a fixed `w-14` column and marks both `value` and `note` `shrink-0` on a `leading-none` row, so a label longer than about eight characters wraps onto two lines and a long note does not wrap at all - it runs past the edge and is clipped. The first version did both: "AI shell commands" wrapped, and the full routed list was cut off mid-word. It also printed the count twice, once as the value and again inside a note that repeated it. The rows are now written to that renderer's actual constraints - short labels, the count as a single `22 / 47`, and a length-budgeted preview of the routed tools ending in `+N`. The complete list stays available through `rtk_status`, which has no width to respect. Three assertions now hold the layout to it, so this cannot drift back.
+
+### Added
+
+- **PHP, uv and sbt are routed.** rtk 0.44 added filters for `php`, `phpunit`, `phpstan`, `pest`, `paratest`, `pint` and `ecs`, plus `uv` and `sbt`, and the default list still came from 0.43. `artisan` needs no entry of its own: it runs as `php artisan …`, so the first token is already `php`. As always the PATH probe drops whatever is not installed, so a longer list costs nothing at runtime - on the development machine it took the routed set from 19 to 22.
+
 ## [0.4.1] - 25-08-2026
 
 ### Added

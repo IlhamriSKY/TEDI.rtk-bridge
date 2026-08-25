@@ -75,9 +75,13 @@ shell *is* PowerShell - and every user-defined function or alias. Wrapping all
 of them turned `cd build && cmake ..` into a silent no-op that reported
 success. No skip-list is long enough to cover that, and RTK only ships filters
 for a known set of tools anyway, so the default is that set: git, gh, glab, gt,
-npm, npx, pnpm, cargo, go, pip, dotnet, mvn, gradlew, docker, kubectl, oc, aws,
-psql, tsc, next, prisma, rake, jest, vitest, playwright, pytest, rspec,
-prettier, ruff, mypy, rubocop, golangci-lint, grep, rg, find, tree, curl, wget.
+npm, npx, pnpm, cargo, go, pip, uv, dotnet, mvn, gradlew, sbt, php, phpunit,
+phpstan, pest, paratest, pint, ecs, docker, kubectl, oc, aws, psql, tsc, next,
+prisma, rake, jest, vitest, playwright, pytest, rspec, prettier, ruff, mypy,
+rubocop, golangci-lint, grep, rg, find, tree, curl and wget.
+
+`artisan` is not listed because it does not need to be: Laravel runs it as
+`php artisan …`, so the first token is already `php`.
 
 Names that collide with a POSIX builtin (`test`, `read`, `env`, `wc`) are left
 out on purpose even though RTK has a verb for them, because `test -f x` and

@@ -217,6 +217,39 @@ await test("an active bridge shows a status-bar badge with the routed count", as
   assert.ok(h.state.statusRemoved >= 1, "badge must be removed on deactivate");
 });
 
+await test("the popover fits its renderer instead of spilling out of it", async () => {
+  // `label` is a fixed `w-14` column and `note` is `shrink-0` on a
+  // `leading-none` row, so a long label wraps to two lines and a long note is
+  // clipped at the edge. The first draft did both: "AI shell commands" wrapped
+  // and the full routed list ran off the popover.
+  const h = makeCtx(); // every default tool "installed" - the widest case
+  await ext.activate(h.ctx);
+  const rows = h.state.statusItem.detail.rows;
+  for (const r of rows) {
+    assert.ok((r.label ?? "").length <= 8, `label too wide for w-14: ${JSON.stringify(r.label)}`);
+    assert.ok((r.note ?? "").length <= 46, `note will be clipped: ${JSON.stringify(r.note)}`);
+    assert.ok((r.value ?? "").length <= 12, `value too wide: ${JSON.stringify(r.value)}`);
+  }
+  // The count is one fact, not a number plus a note repeating it.
+  const routedRow = rows.find((r) => r.label === "Routed");
+  assert.match(routedRow.value, /^\d+ \/ \d+$/, routedRow.value);
+  assert.ok(!/\d+ of \d+/.test(routedRow.note ?? ""), "count must not be printed twice");
+  await ext.deactivate();
+});
+
+await test("the tool preview degrades to +N instead of overflowing", async () => {
+  const { previewList } = await import("../src/present.js");
+  const many = Array.from({ length: 60 }, (_, i) => `tool${i}`);
+  const out = previewList(many);
+  assert.ok(out.length <= 46, `preview too long: ${out.length}`);
+  assert.match(out, /\+\d+$/, out);
+  // A short list is shown whole, with no "+0" tacked on.
+  assert.equal(previewList(["git", "npm"]), "git npm");
+  assert.equal(previewList([]), "");
+  // One name longer than the whole budget still yields something usable.
+  assert.ok(previewList(["a".repeat(80)]).length > 0);
+});
+
 await test("the badge follows a project that turns wrapping off", async () => {
   const h = makeCtx({ onPath: ["rtk", "git"], configFile: { enabled: false } });
   await ext.activate(h.ctx);
