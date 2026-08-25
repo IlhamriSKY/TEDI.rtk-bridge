@@ -13,24 +13,32 @@
 //   - On deactivate / uninstall the host disposes the transformer and the
 //     context subscription; the transform chain returns to passthrough.
 //
+// The rewrite decision itself lives in `transform.js`, which is pure and has
+// its own runnable check. This file is host wiring only.
+//
 // Configuration - `<workspace>/.tedi/rtk.json` (every key optional):
 //   {
-//     "enabled": true,        // false disables wrapping for this project
-//     "command": "rtk",       // the prefix / binary to route through
-//     "skip": ["cd", "export"] // first-token commands to leave untouched
+//     "enabled": true,          // false disables wrapping for this project
+//     "command": "rtk",         // the prefix / binary to route through
+//     "wrap": ["terraform"],    // extra commands to route through RTK
+//     "skip": ["docker"]        // commands to leave alone
 //   }
-// A project with no `.tedi/rtk.json` keeps the original behavior: every command
-// is wrapped with `rtk`. The configured prefix is always skip-listed implicitly,
-// so a meta call like `rtk gain` is never double-wrapped.
 //
 // RTK install: out of scope. See README.
+
+import {
+  DEFAULT_CONFIG,
+  DEFAULT_WRAP,
+  makeConfig,
+  normalizeConfig,
+  parseProbe,
+  probeCommand,
+  transform,
+} from "./transform.js";
 
 const VERIFY_TIMEOUT_SECS = 5;
 const PROBE_VERSION_CMD = "rtk --version";
 const CONFIG_REL_PATH = ".tedi/rtk.json";
-
-/** Behavior when no project config is present: wrap every command with `rtk`. */
-const DEFAULT_CONFIG = { enabled: true, command: "rtk", skip: [] };
 
 /** @type {import("../tedi").ExtensionContext | null} */
 let ctx = null;
@@ -44,6 +52,13 @@ let config = DEFAULT_CONFIG;
 /** Workspace root the current config was loaded for, so context-change events
  *  that don't move the workspace skip a redundant re-read. */
 let loadedRoot = null;
+/** Monotonic ticket for `refreshConfig`, so two workspace switches in flight
+ *  cannot land out of order and leave `config` describing the wrong project. */
+let refreshSeq = 0;
+/** The wrap set every project starts from: `DEFAULT_WRAP` narrowed to what the
+ *  availability probe found on PATH. Falls back to the full list if the probe
+ *  cannot run, which is exactly the pre-probe behavior. */
+let wrapBase = DEFAULT_WRAP;
 
 async function probeOnce() {
   try {
@@ -64,30 +79,65 @@ async function probeOnce() {
   return null;
 }
 
-/** Coerce arbitrary parsed JSON into a valid config, filling defaults so a
- *  partial or malformed file can never break the transformer. */
-function normalizeConfig(raw) {
-  if (!raw || typeof raw !== "object") return DEFAULT_CONFIG;
-  const command =
-    typeof raw.command === "string" && raw.command.trim() ? raw.command.trim() : "rtk";
-  const skip = Array.isArray(raw.skip)
-    ? raw.skip.filter((s) => typeof s === "string" && s.length > 0)
-    : [];
-  // `enabled` defaults to true: a file that omits it still opts the project in.
-  return { enabled: raw.enabled !== false, command, skip };
+/**
+ * Which of `names` resolve on PATH. `null` when the probe could not answer -
+ * it errored, timed out, or came back with nothing - in which case the caller
+ * keeps the full list rather than silently disabling the extension.
+ *
+ * Dropping a tool that is not installed is what stops `rtk <tool>` from
+ * printing "[rtk: program not found]" and then exiting 0 on a command that
+ * never ran. Narrowing too far only costs savings; never correctness.
+ */
+async function probeAvailable(names) {
+  // `rtk` is the canary: `probeOnce` just ran `rtk --version` successfully, so
+  // it is definitely on PATH. Not seeing it back means the shell did not read
+  // the whole argument list and the answer is partial, not informative.
+  const canary = "rtk";
+  try {
+    const res = await ctx.invoke("shell_run_command", {
+      command: probeCommand(ctx.os?.platform, names, canary),
+      cwd: null,
+      timeoutSecs: VERIFY_TIMEOUT_SECS,
+    });
+    const found = parseProbe(res?.stdout ?? "", names, canary);
+    if (!found) {
+      ctx.logger?.warn?.(
+        "PATH probe came back without its canary, so this shell did not read the whole list; routing the full default set instead.",
+      );
+    }
+    return found;
+  } catch (err) {
+    ctx.logger?.info?.("PATH probe failed; routing the full default list", err);
+    return null;
+  }
+}
+
+/** Surface a rejected config file. It only fires on a malformed or hostile
+ *  `.tedi/rtk.json`, so a toast is proportionate - silently disabling would
+ *  leave the user wondering why RTK stopped. */
+function reportRejected(message) {
+  ctx?.logger?.error?.(message);
+  try {
+    ctx?.ui?.toast?.(message, { variant: "error" });
+  } catch {
+    // Toast permission missing; the log line stands on its own.
+  }
 }
 
 /** Read `<root>/.tedi/rtk.json`. A missing, unreadable, or invalid file falls
- *  back to the default (wrap everything), so RTK keeps working with no config. */
+ *  back to the default, so RTK keeps working with no config. */
 async function loadConfig(root) {
-  if (!root) return DEFAULT_CONFIG;
+  // `wrapBase`, not `DEFAULT_WRAP`: a project with no config file still only
+  // routes the tools the probe found on this machine.
+  const fallback = makeConfig(true, "rtk", wrapBase);
+  if (!root) return fallback;
   const path = `${root.replace(/[\\/]+$/, "")}/${CONFIG_REL_PATH}`;
   try {
     const res = await ctx.invoke("fs_read_file", { path });
-    if (!res || res.kind !== "text") return DEFAULT_CONFIG;
-    return normalizeConfig(JSON.parse(res.content));
+    if (!res || res.kind !== "text") return fallback;
+    return normalizeConfig(JSON.parse(res.content), reportRejected, wrapBase);
   } catch {
-    return DEFAULT_CONFIG;
+    return fallback;
   }
 }
 
@@ -95,20 +145,10 @@ async function loadConfig(root) {
 async function refreshConfig(root) {
   if (root === loadedRoot) return;
   loadedRoot = root;
-  config = await loadConfig(root);
-}
-
-/**
- * Synchronous transformer the host calls for every AI shell command (both the
- * hidden `bash` kind and the visible `terminal` kind). Wraps the command with
- * the configured prefix unless wrapping is disabled, the first token is in
- * `skip`, or it already starts with the prefix (which prevents `rtk rtk ...`).
- */
-function rtkTransformer(command) {
-  if (!config.enabled) return command;
-  const firstToken = command.trimStart().split(/\s+/)[0] ?? "";
-  if (firstToken === config.command || config.skip.includes(firstToken)) return command;
-  return `${config.command} ${command}`;
+  const seq = ++refreshSeq;
+  const next = await loadConfig(root);
+  // A later switch started while this read was in flight - it owns `config`.
+  if (seq === refreshSeq) config = next;
 }
 
 /** @param {import("../tedi").ExtensionContext} context */
@@ -130,7 +170,11 @@ export async function activate(context) {
     );
     return;
   }
-  ctx.logger?.info?.(`RTK ${version} detected; registering shell transformer`);
+  const available = await probeAvailable(DEFAULT_WRAP);
+  if (available) wrapBase = DEFAULT_WRAP.filter((c) => available.has(c));
+  ctx.logger?.info?.(
+    `RTK ${version} detected; routing ${wrapBase.length}/${DEFAULT_WRAP.length} tools (${wrapBase.join(", ")})`,
+  );
 
   // Load the active workspace's config before registering, so the first command
   // already runs under the project's settings. Then track workspace switches:
@@ -142,7 +186,9 @@ export async function activate(context) {
   });
 
   try {
-    disposeTransformer = ctx.shell.registerCommandTransformer(rtkTransformer);
+    disposeTransformer = ctx.shell.registerCommandTransformer((command) =>
+      transform(config, command),
+    );
   } catch (err) {
     // Permission error or older TEDI without the API. Surface clearly so the
     // user knows nothing is being wrapped.
@@ -161,7 +207,7 @@ export async function activate(context) {
   if (hasShownOnboarding) return;
   try {
     ctx.ui.toast(
-      `RTK ${version} detected. AI shell commands are routed through RTK; configure it per project in .tedi/rtk.json.`,
+      `RTK ${version} detected. ${wrapBase.length} of your installed dev tools are routed through RTK; configure it per project in .tedi/rtk.json.`,
       { variant: "success" },
     );
   } catch (err) {
@@ -190,6 +236,7 @@ export async function deactivate() {
     disposeTransformer = null;
   }
   config = DEFAULT_CONFIG;
+  wrapBase = DEFAULT_WRAP;
   loadedRoot = null;
   ctx = null;
 }

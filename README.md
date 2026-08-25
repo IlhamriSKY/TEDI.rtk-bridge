@@ -34,7 +34,9 @@ card. If a new release exists, click **Update** to reinstall in place.
 ```mermaid
 flowchart TD
     A["TEDI AI agent"] -->|"tool: bash_run, command 'git status'"| B["applyShellTransformers(cmd, 'bash')"]
-    B -->|"this extension's transformer prefixes 'rtk '"| C["rtk git status"]
+    B --> G{"first token in<br/>the wrap list?"}
+    G -->|"no: cd, Get-ChildItem, ./script.sh"| H["runs exactly as written"]
+    G -->|"yes: git, npm, docker, ..."| C["rtk git status"]
     C --> D["git status runs"]
     D --> E["compressed output"]
     E --> F["back to the AI"]
@@ -44,8 +46,8 @@ On activate:
 
 1. Runs `rtk --version` once to confirm RTK is on `PATH`.
 2. If present, reads the active workspace's `.tedi/rtk.json` (if any), then
-   registers a `ctx.shell.registerCommandTransformer` that wraps each
-   AI-issued shell command with the configured prefix.
+   registers a `ctx.shell.registerCommandTransformer` that prefixes the
+   AI-issued commands RTK actually filters.
 3. Re-reads the config whenever the active workspace changes.
 4. Shows a one-time onboarding toast (latched so it never repeats on the same
    machine).
@@ -54,6 +56,48 @@ On disable or uninstall, the transformer and the workspace subscription are
 dropped and TEDI's shell tools go back to running commands raw. No core TEDI
 code is RTK-aware.
 
+### Why only some commands
+
+`rtk <name>` resolves `<name>` on `PATH`. Anything that is not a file on `PATH`
+prints `[rtk: program not found]` and then **exits 0**:
+
+```console
+$ rtk cd sub
+rtk: Failed to resolve 'cd' via PATH, falling back to direct exec: Binary 'cd' not found on PATH
+[rtk: program not found]
+$ echo $?
+0
+```
+
+That covers every shell builtin (`cd`, `export`, `source`, `set`), every
+PowerShell cmdlet - which is most of what runs on Windows, where TEDI's AI
+shell *is* PowerShell - and every user-defined function or alias. Wrapping all
+of them turned `cd build && cmake ..` into a silent no-op that reported
+success. No skip-list is long enough to cover that, and RTK only ships filters
+for a known set of tools anyway, so the default is that set: git, gh, glab, gt,
+npm, npx, pnpm, cargo, go, pip, dotnet, mvn, gradlew, docker, kubectl, oc, aws,
+psql, tsc, next, prisma, rake, jest, vitest, playwright, pytest, rspec,
+prettier, ruff, mypy, rubocop, golangci-lint, grep, rg, find, tree, curl, wget.
+
+Names that collide with a POSIX builtin (`test`, `read`, `env`, `wc`) are left
+out on purpose even though RTK has a verb for them, because `test -f x` and
+`rtk test` are not the same command.
+
+The same trap fires for a listed tool you simply do not have - `rtk oc version`
+on a machine with no `oc` also prints `[rtk: program not found]` and exits 0 -
+so activate runs one more probe (`where.exe <names>` on Windows,
+`command -v <names>` elsewhere; neither needs shell syntax, so the same call
+works under sh, bash, zsh, PowerShell and cmd) and drops everything that is not
+on `PATH`.
+
+Multi-name lookup is an extension in every shell that has it, so the probe ends
+with a canary: `rtk` itself, which `rtk --version` just proved is on `PATH`. If
+the canary comes back, the shell read the whole argument list and the answer can
+be trusted. If it does not, the answer is partial and is thrown away rather than
+read as "these tools are missing", which would have quietly stopped RTK wrapping
+almost everything. A tool you name yourself in `wrap` is trusted without a probe
+hit, and the log line at startup says exactly which tools ended up routed.
+
 ## Configuration
 
 Settings are per project, in `<workspace>/.tedi/rtk.json` (the same `.tedi/`
@@ -61,16 +105,24 @@ folder TEDI uses for memory and skills). Every key is optional:
 
 ```jsonc
 {
-  "enabled": true,           // false turns RTK off for this project
-  "command": "rtk",          // the prefix / binary to route through
-  "skip": ["cd", "export"]   // first-token commands left untouched
+  "enabled": true,          // false turns RTK off for this project
+  "command": "rtk",         // the prefix / binary to route through
+  "wrap": ["terraform"],    // extra commands to route through RTK
+  "skip": ["docker"]        // commands to leave alone
 }
 ```
 
-- With **no** `.tedi/rtk.json`, every command is wrapped with `rtk` (the
-  original behavior), so RTK works out of the box once installed.
+- With **no** `.tedi/rtk.json`, the default list above applies, so RTK works out
+  of the box once installed.
+- `wrap` adds to that list, `skip` removes from it. RTK falls back to raw
+  passthrough plus tracking for a command it has no filter for, so adding your
+  own tools is safe as long as they are real executables.
 - The configured `command` is always skipped implicitly, so a meta call like
   `rtk gain` is never double-wrapped.
+- `command` must be a bare program name or a space-free path. Anything else - a
+  pipeline, a quoted path, a `;` - is refused, wrapping is disabled for that
+  project, and a toast explains why. The value is concatenated into the command
+  string the shell runs, and a `.tedi/` folder can arrive with a cloned repo.
 - The file is read at activate and re-read on workspace switch. After editing
   it in the open project, toggle the extension off / on (or reopen the
   workspace) to pick up the change.
@@ -80,8 +132,8 @@ folder TEDI uses for memory and skills). Every key is optional:
 | Permission | Why |
 | --- | --- |
 | `ui:toast` | Onboarding toast on first RTK detect. |
-| `shell:transform` | Rewrite every AI shell command. **High risk:** the extension chooses what runs. |
-| `invoke:shell_run_command` | Run `rtk --version` once per activate. |
+| `shell:transform` | Rewrite AI shell commands. **High risk:** the extension chooses what runs. |
+| `invoke:shell_run_command` | Run `rtk --version` and one `PATH` probe, once per activate. |
 | `invoke:fs_read_file` | Read `<workspace>/.tedi/rtk.json` for per-project settings. |
 
 Reads only `<workspace>/.tedi/rtk.json`. No keychain, no network. RTK itself is
@@ -96,6 +148,11 @@ cd TEDI.rtk-bridge
 # Build extension.js from src/ (generated by esbuild, not committed).
 npm install
 npm run build
+
+# Two runnable checks: the rewrite decision (pure), and the built bundle
+# driven through the host contract with a fake ctx.
+npm run verify
+npm run typecheck
 
 # Package, then install via Settings → Extensions → From file:
 zip dev.zip manifest.json extension.js logo.png README.md CHANGELOG.md LICENSE

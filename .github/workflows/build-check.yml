@@ -9,12 +9,14 @@ on:
     branches: ["**"]
     paths:
       - "src/**"
+      - "scripts/**"
       - "build.mjs"
       - "package.json"
       - "package-lock.json"
   pull_request:
     paths:
       - "src/**"
+      - "scripts/**"
       - "build.mjs"
       - "package.json"
       - "package-lock.json"
@@ -34,3 +36,7 @@ jobs:
         run: node build.mjs
       - name: Syntax check the built bundle
         run: node --check extension.js
+      - name: Verify the rewrite decision table
+        run: node scripts/verify.mjs
+      - name: Verify the built bundle against the host contract
+        run: node scripts/verify-activate.mjs
