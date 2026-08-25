@@ -2,6 +2,12 @@
 
 All notable changes to **TEDI RTK Bridge**. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [0.4.3] - 25-08-2026
+
+### Fixed
+
+- **The badge drew an empty box instead of an icon.** The host resolves a `lucide:<Name>` reference against lucide-react's `icons` *record*, not against its named exports, and lucide renamed this glyph: `Filter` survives as a deprecated named export but is no longer a key in `icons`, so the lookup returned null and the status bar fell through to its placeholder. It is `lucide:Funnel` now. A check pins the name to a short list verified against `Object.keys(icons)`, since this repo cannot import lucide to test it directly. Swept the other eight bundled extensions for the same mistake: all 28 of their icon references resolve.
+
 ## [0.4.2] - 25-08-2026
 
 ### Fixed

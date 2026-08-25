@@ -93,7 +93,13 @@ export function renderStatusItem(ctx, snapshot) {
   try {
     ctx.statusBar.setItem({
       id: STATUS_ITEM_ID,
-      icon: "lucide:Filter",
+      // `Funnel`, not `Filter`. The host resolves a `lucide:` ref against
+      // lucide-react's `icons` RECORD, not its named exports, and lucide
+      // renamed this glyph: `Filter` survives as a deprecated named export but
+      // is not a key in `icons`, so the ref resolved to null and the status bar
+      // drew an empty placeholder box. Any lucide name that is only an alias
+      // fails the same way - check `Object.keys(icons)`, not the export list.
+      icon: "lucide:Funnel",
       kind: "status",
       tone: on ? "success" : "default",
       label,

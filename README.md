@@ -117,6 +117,14 @@ READMEs before answering. Two things fix that.
   commands are already prefixed - it should never type `rtk` itself. Calling the
   tool returns the exact routed list and where the configuration came from.
 
+A tool that is installed but not on the `PATH` the TEDI **process** inherited
+does not count. That catches Laragon in particular: it puts PHP on the shell
+session's `PATH`, not the persistent one, so `php` works in a terminal while
+TEDI cannot see it. Add the directory to the Windows environment variable and
+restart TEDI rather than forcing it with `wrap` - a `wrap` entry skips the
+probe, and `rtk php …` on a `php` rtk cannot resolve is exactly the
+"[rtk: program not found]", exit 0 case the probe exists to prevent.
+
 > [!NOTE]
 > The badge needs the `statusbar:write` permission, added in 0.4.1. Updating
 > from an earlier version shows it in the install review dialog as a newly

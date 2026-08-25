@@ -237,6 +237,24 @@ await test("the popover fits its renderer instead of spilling out of it", async 
   await ext.deactivate();
 });
 
+await test("the badge icon is a name lucide's icons record actually has", async () => {
+  // The host resolves `lucide:<Name>` against lucide-react's `icons` RECORD.
+  // `Filter` is still a named export but was renamed to `Funnel` in the record,
+  // so the first release drew an empty placeholder box in the status bar.
+  // This repo cannot import lucide, so the guard is a short allowlist of names
+  // verified against `Object.keys(icons)`; re-check before changing it.
+  const VERIFIED_IN_ICONS_RECORD = ["Funnel", "ListFilter", "Gauge", "Scissors", "Zap"];
+  const h = makeCtx({ onPath: ["rtk", "git"] });
+  await ext.activate(h.ctx);
+  const icon = h.state.statusItem.icon;
+  assert.match(icon, /^lucide:/, icon);
+  assert.ok(
+    VERIFIED_IN_ICONS_RECORD.includes(icon.slice("lucide:".length)),
+    `${icon} is not on the verified list - confirm it is a key of lucide's icons record, not just a named export`,
+  );
+  await ext.deactivate();
+});
+
 await test("the tool preview degrades to +N instead of overflowing", async () => {
   const { previewList } = await import("../src/present.js");
   const many = Array.from({ length: 60 }, (_, i) => `tool${i}`);
