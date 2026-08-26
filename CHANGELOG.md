@@ -2,6 +2,12 @@
 
 All notable changes to **TEDI RTK Bridge**. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [SemVer](https://semver.org/).
 
+## [0.4.4] - 26-08-2026
+
+### Removed
+
+- **The status-bar badge is gone.** The bar is shared with every other extension, and a count that only moves when a project's `.tedi/rtk.json` changes did not earn a permanent seat there. Nothing about routing changed: commands are still rewritten exactly as before, and `rtk_status` still answers with the routed list, the prefix and whether the `PATH` probe narrowed the set - which was always the surface that mattered, since its description sits in the model's tool list every turn. The `statusbar:write` permission went with it, so the extension now asks for one fewer thing than it did in 0.4.1.
+
 ## [0.4.3] - 25-08-2026
 
 ### Fixed

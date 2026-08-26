@@ -106,12 +106,8 @@ hit, and the log line at startup says exactly which tools ended up routed.
 
 The bridge used to be invisible, which meant TEDI's own AI had to go and
 discover it: asked whether it could use RTK, it grepped the repo and read two
-READMEs before answering. Two things fix that.
+READMEs before answering. What fixes that is one surface.
 
-- A **status-bar badge** with the number of routed commands. Its tooltip lists
-  them, names the prefix, and says whether the `PATH` probe narrowed the set. It
-  turns grey when a project has wrapping switched off, and it is absent entirely
-  when RTK is not installed.
 - An **`rtk_status` tool** contributed to the agent. Its description is in the
   model's tool list every turn, so the agent knows RTK is active and that
   commands are already prefixed - it should never type `rtk` itself. Calling the
@@ -124,12 +120,6 @@ TEDI cannot see it. Add the directory to the Windows environment variable and
 restart TEDI rather than forcing it with `wrap` - a `wrap` entry skips the
 probe, and `rtk php …` on a `php` rtk cannot resolve is exactly the
 "[rtk: program not found]", exit 0 case the probe exists to prevent.
-
-> [!NOTE]
-> The badge needs the `statusbar:write` permission, added in 0.4.1. Updating
-> from an earlier version shows it in the install review dialog as a newly
-> requested permission; approve it to turn the badge on. Command routing works
-> either way.
 
 ## Configuration
 
@@ -165,7 +155,6 @@ folder TEDI uses for memory and skills). Every key is optional:
 | Permission | Why |
 | --- | --- |
 | `ui:toast` | Onboarding toast on first RTK detect. |
-| `statusbar:write` | The badge showing how many commands are routed. |
 | `shell:transform` | Rewrite AI shell commands. **High risk:** the extension chooses what runs. |
 | `invoke:shell_run_command` | Run `rtk --version` and one `PATH` probe, once per activate. |
 | `invoke:fs_read_file` | Read `<workspace>/.tedi/rtk.json` for per-project settings. |

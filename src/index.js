@@ -35,13 +35,7 @@ import {
   probeCommand,
   transform,
 } from "./transform.js";
-import {
-  AI_TOOL_NAME,
-  aiToolDescription,
-  describe,
-  removeStatusItem,
-  renderStatusItem,
-} from "./present.js";
+import { AI_TOOL_NAME, aiToolDescription, describe } from "./present.js";
 
 const VERIFY_TIMEOUT_SECS = 5;
 const PROBE_VERSION_CMD = "rtk --version";
@@ -160,9 +154,9 @@ async function refreshConfig(root) {
   // A later switch started while this read was in flight - it owns `config`.
   if (seq !== refreshSeq) return;
   config = next;
-  // A project can turn wrapping off or change the routed set, so the badge is
-  // re-rendered from the config that actually won, not from the default.
-  if (presence) renderStatusItem(ctx, { ...presence, config });
+  // Nothing to redraw: `rtk_status` builds its answer from `config` at call
+  // time, so a project that turns wrapping off is reflected on the next call
+  // without anything being pushed anywhere.
 }
 
 /**
@@ -263,10 +257,9 @@ export async function activate(context) {
     return;
   }
 
-  // Both surfaces go up only after the transformer really registered, so
-  // neither can claim RTK is handling commands when nothing is.
+  // The tool goes up only after the transformer really registered, so its
+  // description cannot claim RTK is handling commands when nothing is.
   presence = { ...presence, config };
-  renderStatusItem(ctx, presence);
   publishAiTool();
 
   if (hasShownOnboarding) return;
@@ -300,10 +293,8 @@ export async function deactivate() {
     }
     disposeTransformer = null;
   }
-  // The host clears contributed AI tools and status items on deactivate; the
-  // explicit remove keeps the badge from lingering if only this half is torn
-  // down (a reload writes a new bundle without a full uninstall).
-  if (ctx) removeStatusItem(ctx);
+  // The host clears contributed AI tools on deactivate, so there is nothing
+  // left to take down by hand.
   presence = null;
   config = DEFAULT_CONFIG;
   wrapBase = DEFAULT_WRAP;

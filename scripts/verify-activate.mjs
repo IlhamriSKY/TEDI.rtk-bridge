@@ -200,81 +200,9 @@ await test("deactivate releases both host registrations", async () => {
 
 // ------------------------- Being visible at all ------------------------------
 // The bridge used to be invisible: asking TEDI's own AI "can you access rtk?"
-// sent it grepping the repo and reading two READMEs before it could answer.
-
-await test("an active bridge shows a status-bar badge with the routed count", async () => {
-  const h = makeCtx({ onPath: ["rtk", "git", "npm", "docker"] });
-  await ext.activate(h.ctx);
-  const item = h.state.statusItem;
-  assert.ok(item, "no status item was published");
-  assert.equal(item.id, "rtk");
-  assert.equal(item.tone, "success");
-  assert.equal(item.label, "3", "badge must count the routed tools, not the defaults");
-  assert.match(item.tooltip, /RTK 0\.43\.0 is routing 3 commands/);
-  // The detail has to name the tools, or the badge says nothing actionable.
-  assert.ok(JSON.stringify(item.detail).includes("git"), item.detail);
-  await ext.deactivate();
-  assert.ok(h.state.statusRemoved >= 1, "badge must be removed on deactivate");
-});
-
-await test("the popover fits its renderer instead of spilling out of it", async () => {
-  // `label` is a fixed `w-14` column and `note` is `shrink-0` on a
-  // `leading-none` row, so a long label wraps to two lines and a long note is
-  // clipped at the edge. The first draft did both: "AI shell commands" wrapped
-  // and the full routed list ran off the popover.
-  const h = makeCtx(); // every default tool "installed" - the widest case
-  await ext.activate(h.ctx);
-  const rows = h.state.statusItem.detail.rows;
-  for (const r of rows) {
-    assert.ok((r.label ?? "").length <= 8, `label too wide for w-14: ${JSON.stringify(r.label)}`);
-    assert.ok((r.note ?? "").length <= 46, `note will be clipped: ${JSON.stringify(r.note)}`);
-    assert.ok((r.value ?? "").length <= 12, `value too wide: ${JSON.stringify(r.value)}`);
-  }
-  // The count is one fact, not a number plus a note repeating it.
-  const routedRow = rows.find((r) => r.label === "Routed");
-  assert.match(routedRow.value, /^\d+ \/ \d+$/, routedRow.value);
-  assert.ok(!/\d+ of \d+/.test(routedRow.note ?? ""), "count must not be printed twice");
-  await ext.deactivate();
-});
-
-await test("the badge icon is a name lucide's icons record actually has", async () => {
-  // The host resolves `lucide:<Name>` against lucide-react's `icons` RECORD.
-  // `Filter` is still a named export but was renamed to `Funnel` in the record,
-  // so the first release drew an empty placeholder box in the status bar.
-  // This repo cannot import lucide, so the guard is a short allowlist of names
-  // verified against `Object.keys(icons)`; re-check before changing it.
-  const VERIFIED_IN_ICONS_RECORD = ["Funnel", "ListFilter", "Gauge", "Scissors", "Zap"];
-  const h = makeCtx({ onPath: ["rtk", "git"] });
-  await ext.activate(h.ctx);
-  const icon = h.state.statusItem.icon;
-  assert.match(icon, /^lucide:/, icon);
-  assert.ok(
-    VERIFIED_IN_ICONS_RECORD.includes(icon.slice("lucide:".length)),
-    `${icon} is not on the verified list - confirm it is a key of lucide's icons record, not just a named export`,
-  );
-  await ext.deactivate();
-});
-
-await test("the tool preview degrades to +N instead of overflowing", async () => {
-  const { previewList } = await import("../src/present.js");
-  const many = Array.from({ length: 60 }, (_, i) => `tool${i}`);
-  const out = previewList(many);
-  assert.ok(out.length <= 46, `preview too long: ${out.length}`);
-  assert.match(out, /\+\d+$/, out);
-  // A short list is shown whole, with no "+0" tacked on.
-  assert.equal(previewList(["git", "npm"]), "git npm");
-  assert.equal(previewList([]), "");
-  // One name longer than the whole budget still yields something usable.
-  assert.ok(previewList(["a".repeat(80)]).length > 0);
-});
-
-await test("the badge follows a project that turns wrapping off", async () => {
-  const h = makeCtx({ onPath: ["rtk", "git"], configFile: { enabled: false } });
-  await ext.activate(h.ctx);
-  assert.equal(h.state.statusItem.tone, "default", "a disabled project must not read as active");
-  assert.match(h.state.statusItem.tooltip, /wrapping is off/);
-  await ext.deactivate();
-});
+// sent it grepping the repo and reading two READMEs before it could answer. The
+// AI tool is what fixed that, and it is now the ONLY surface: the status-bar
+// badge was removed in 0.4.4.
 
 await test("the agent is told RTK is on without having to go looking", async () => {
   const h = makeCtx({ onPath: ["rtk", "git", "npm"] });
@@ -295,28 +223,29 @@ await test("the agent is told RTK is on without having to go looking", async () 
   await ext.deactivate();
 });
 
-await test("no RTK means no badge and no tool claiming otherwise", async () => {
+await test("no RTK means no tool claiming otherwise", async () => {
   const h = makeCtx();
   h.ctx.invoke = async (cmd) => {
     if (cmd === "shell_run_command") return { stdout: "", exit_code: 127 };
     throw new Error("ENOENT");
   };
   await ext.activate(h.ctx);
-  assert.equal(h.state.statusItem, null, "a badge would claim RTK is running when it is not");
   assert.equal(h.state.aiTools.length, 0, "the tool description asserts RTK is active");
   await ext.deactivate();
 });
 
-await test("a host without statusbar:write still routes commands", async () => {
-  // The permission is new in 0.4.1; an install that predates it must degrade
-  // to "works but cannot show itself", not to a dead activate.
-  const h = makeCtx({ onPath: ["rtk", "git"] });
-  h.ctx.statusBar.setItem = () => {
-    throw new Error("permission denied: statusbar:write");
-  };
+await test("the bridge claims no seat in the status bar", async () => {
+  // Removed in 0.4.4: the bar is shared with every other extension, and a count
+  // that only moves when the project config changes does not earn a permanent
+  // seat there. The manifest dropped `statusbar:write` with it, so a badge
+  // pushed from here would now be refused at the permission gate anyway - and
+  // refusals are logged at a level release builds drop, so it would fail
+  // silently. Assert on the host stub instead, where it cannot be missed.
+  const h = makeCtx({ onPath: ["rtk", "git", "npm"] });
   await ext.activate(h.ctx);
-  assert.equal(h.state.transformer("git status"), "rtk git status");
+  assert.equal(h.state.statusItem, null, "the bridge must not publish a status item");
   await ext.deactivate();
+  assert.equal(h.state.statusRemoved, 0, "and must not be reaching for the status bar at all");
 });
 
 console.log(`\n${ran} activate checks passed`);
